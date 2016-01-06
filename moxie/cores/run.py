@@ -82,14 +82,9 @@ class RunService(EventService):
         binds = ["{host}:{container}".format(
             host=x.host, container=x.container) for x in volumes]
 
-        # links = yield from self.database.link(job.volume_id)
-        # links = ["{remote}:{alias}".format(**x) for x in links]
-
         yield from self.containers.start(job.name, {
             "Binds": binds,
             "Privileged": False,
-            "PortBindings": [],
-            "Links": [],  # XXX: Fix me!
         })
 
         if not job.manual:
@@ -110,7 +105,8 @@ class RunService(EventService):
         volumes = yield from self.database.volume.get(job.volumes_id)
 
         env = ["{key}={value}".format(**x) for x in jobenvs]
-        volumes = {x.host: x.container for x in volumes}
+        binds = ["{host}:{container}".format(
+            host=x.host, container=x.container) for x in volumes]
 
         yield from self.log('pull', image=job.image, job=job.name)
 
@@ -130,11 +126,13 @@ class RunService(EventService):
                  "AttachStdin": True,
                  "AttachStdout": True,
                  "AttachStderr": True,
-                 "ExposedPorts": [],
-                 "Volumes": volumes,
                  "Tty": True,
                  "OpenStdin": False,
-                 "StdinOnce": False},
+                 "StdinOnce": False,
+                 "HostConfig": {
+                    "Binds": binds,
+                 }
+                },
                 name=job.name)
         except ValueError as e:
             yield from self.log('error', job=job.name, error=e)
